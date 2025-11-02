@@ -1,0 +1,22 @@
+SELECT 
+    e.pais,
+    MONTH(a.data_inicio) AS mes,
+    b.modelo,
+    SUM(b.emissao_co2_kg) AS co2_total
+FROM aluguel a
+JOIN bicicleta b ON a.id_bicicleta = b.id
+JOIN estacao e ON b.id_estacao = e.id
+WHERE e.pais IN ('Brasil', 'Estados Unidos', 'India')
+GROUP BY e.pais, mes, b.modelo
+ORDER BY e.pais, mes, co2_total DESC;
+Explicando passo a passo:
+
+JOIN conecta aluguel → bicicleta → estação.
+
+WHERE e.pais IN (...) filtra apenas os países desejados.
+
+GROUP BY e.pais, mes, b.modelo agrupa os dados por país, mês e modelo.
+
+SUM(b.emissao_co2_kg) calcula o total de CO₂ evitado em cada grupo.
+
+ORDER BY ... DESC mostra primeiro os modelos que mais evitam CO₂.
