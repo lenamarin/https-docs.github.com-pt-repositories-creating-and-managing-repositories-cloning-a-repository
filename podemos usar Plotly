@@ -1,0 +1,40 @@
+podemos usar Plotly, que é excelente para gráficos interativos em Python:
+
+import pandas as pd
+import plotly.express as px
+import mysql.connector
+
+# Conectar ao banco de dados MySQL
+conn = mysql.connector.connect(
+    host="seu_host",
+    user="seu_usuario",
+    password="sua_senha",
+    database="seu_banco"
+)
+
+# Ler dados da view ranking_co2_numerico
+query = "SELECT pais, modelo, co2_total, ranking FROM ranking_co2_numerico WHERE ranking <= 3"
+df = pd.read_sql(query, conn)
+
+# Fechar conexão
+conn.close()
+
+# Criar gráfico interativo
+fig = px.bar(
+    df, 
+    x='modelo', 
+    y='co2_total', 
+    color='pais', 
+    text='ranking',
+    hover_data={'modelo': True, 'pais': True, 'co2_total': True, 'ranking': True},
+    barmode='group',
+    labels={'co2_total': 'CO₂ Evitado (kg)', 'modelo': 'Modelo da Bicicleta'}
+)
+
+fig.update_traces(textposition='outside')
+fig.update_layout(title='Top 3 Modelos Mais Verdes por País (Interativo)',
+                  xaxis_title='Modelo da Bicicleta',
+                  yaxis_title='CO₂ Evitado (kg)',
+                  legend_title='País')
+
+fig.show()
