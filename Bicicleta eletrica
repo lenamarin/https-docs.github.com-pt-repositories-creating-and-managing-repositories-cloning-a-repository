@@ -1,0 +1,326 @@
+1) Principais achados rápidos (resumido)
+
+
+Pouca evidência pública de valores absolutos (J/consulta) comparando SQLite vs MySQL sob a mesma carga — a maioria dos estudos compara engines (MySQL/Postgres/NoSQL) ou analisa metodologias de medição/benchmarks. cs.ru.nl+1
+
+
+Estudos mostram variação grande entre DBMSs: MySQL e outros servidores tendem a gastar mais energia em algumas configurações/benchmarks; num estudo de offloading MySQL “sofreu mais, consumindo cerca de 4× mais energia” em certas condições. Isto ilustra que diferenças podem ser grandes dependendo do teste. informatica.vu.lt
+
+
+SQLite tem arquitetura serverless (biblioteca, arquivo único) → overhead fixo menor (sem processo servidor, sem listeners/threads) — argumento arquitetural que justifica menor consumo no cenário leve/local. (fontes comparativas de arquitetura). airbyte.com+1
+
+
+Medir energia requer experimento controlado (medir potência do host enquanto executa workload representativo), porque resultados dependem de hardware, SSD vs HDD, otimizações, e padrões de carga. Há trabalhos metodológicos descrevendo como recolher W/kWh por segundo e por query. sciencedirect.com+1
+
+
+
+2) Fontes principais que usei (leitura recomendada)
+
+
+Database energy benchmarks: an evaluation — tese que discute como benchmarks avaliam energia (MySQL vs PostgreSQL). cs.ru.nl
+
+
+A Study of the Energy Consumption of Databases and Cloud Patterns — estudo experimental comparando MySQL/Postgres/MongoDB (metodologias e resultados por workload). ptidej.net+1
+
+
+Offloaded Data Processing Energy Efficiency Evaluation — exemplo onde MySQL consumiu ~4× mais energia em certas configurações. informatica.vu.lt
+
+
+Artigos e posts técnicos sobre diferenças arquiteturais (SQLite serverless vs MySQL client-server). airbyte.com+1
+
+
+Trabalhos recentes sobre estimação de energia por query / profiling (modelos/medição). sciencedirect.com+1
+
+
+
+3) Como converter energia medida → CO₂ (fórmula e fator)
+Fórmula simples:
+kg CO2=kWh consumidos×Fator de emissa˜o (kg CO2/kWh)\text{kg CO}_2 = \text{kWh consumidos} \times \text{Fator de emissão (kg CO}_2\text{/kWh)}kg CO2​=kWh consumidos×Fator de emissa˜o (kg CO2​/kWh)
+Exemplo de fatores (use o fator local/ano que for mais apropriado para o teu relatório; abaixo duas referências para o Brasil):
+
+
+Climatiq / Climate Transparency (Brasil): 0.1295 kgCO₂/kWh (valor de referência 2021). climatiq.io
+
+
+EPE — BEN 2024 (relatório Brasil): ~55.1 kg CO₂ / MWh = 0.0551 kgCO₂/kWh (relatórios nacionais podem usar metodologias distintas — por isso mostre a fonte que escolheu). EPE
+
+
+
+Observação: escolha e declare claramente no relatório o fator de emissão que usou (ex.: “utilizamos 0.1295 kgCO₂/kWh conforme Climatiq (2021)”), e discuta que outros inventários/relatórios podem dar fatores diferentes — inclua isso como incerteza.
+
+
+4) Protocolo experimental (passo-a-passo que você pode citar no método)
+
+
+Ambiente de teste
+
+
+Máquina de teste: CPU, RAM, disco (SSD/HDD), sistema operativo. Documente tudo.
+
+
+Se possível, faça testes em hardware real (não só VM na nuvem) porque na nuvem não é trivial medir consumo eléctrico do host.
+
+
+
+
+Medição de potência
+
+
+Use um medidor de tomada (kill-a-watt) no equipamento físico host ou use IPMI/PMBUS/PowerMeter do data-center se disponível. Registre potência (W) a cada segundo. sciencedirect.com
+
+
+
+
+Workloads
+
+
+Defina 3 workloads representativos do teu caso de uso leve: (A) leituras majoritárias pequenas, (B) leituras+escritas baixas, (C) escrita concorrente leve.
+
+
+Use um gerador de carga (ex.: sysbench para MySQL; para SQLite você pode rodar scripts Python/Go que executem as mesmas queries e medirem latência/ops). Documente número de operações, latência média e throughput.
+
+
+
+
+Procedimento
+
+
+Medir potência idle (host com DB instalado mas sem carga) por 5 min — média P_idle.
+
+
+Rodar cada workload por N minutos (ex.: 10 min), coletar potência média P_workload.
+
+
+Energia consumida pelo workload ≈ (P_workload − P_idle) × tempo (em horas).
+
+
+Divida energia pela número de operações úteis executadas no período → energia por operação (kWh/op ou J/op). sciencedirect.com
+
+
+
+
+Conversão para CO₂
+
+
+Aplicar fator de emissão local (kgCO₂/kWh) para obter kgCO₂ por operação.
+
+
+
+
+Repetições e estatística
+
+
+Repita cada teste 3–5×, calcule média e desvio padrão. Reporte incerteza.
+
+
+
+
+
+5) Exemplo de cálculo ilustrativo (sem inventar medições)
+Suponha que, num teste (hipotético apenas para mostrar cálculo):
+
+
+P_idle = 20 W
+
+
+P_workload (MySQL) = 30 W (média durante o teste)
+
+
+P_workload (SQLite) = 25 W
+
+
+Tempo = 10 minutos = 10/60 h ≈ 0.1667 h
+
+
+Ops executadas no teste: MySQL = 60.000 ops ; SQLite = 60.000 ops (mesma carga)
+
+
+Energia MySQL = (30−20) W × 0.1667 h = 10 W × 0.1667 h = 1.667 Wh = 0.001667 kWh
+Energia por operação MySQL = 0.001667 kWh / 60.000 ≈ 2.78×10⁻⁸ kWh/op = 0.0001 J/op?
+(Nota: para J/op multiplicar kWh → kJ: 1 kWh = 3.6×10⁶ J; assim 0.001667 kWh = 6,000 J total → 6,000 / 60,000 = 0.1 J/op.)
+Conversão CO₂ usando Climatiq (0.1295 kgCO₂/kWh):
+
+
+CO₂ MySQL = 0.001667 kWh × 0.1295 kgCO₂/kWh = 0.000216 kgCO₂ = 0.216 gCO₂ para todo o teste; por operação ≈ 0.216 g / 60,000 ≈ 0.0000036 gCO₂/op.
+
+
+
+Importante: os números acima são ilustrativos para mostrar a metodologia. Não use esses valores crus no relatório sem a medição real.
+
+
+6) Texto pronto (metodologia) que você pode colar no relatório
+
+“Para quantificar a pegada energética e de emissões das opções SQLite e MySQL no cenário de uso local e leve, executámos um conjunto controlado de benchmarks no hardware X (documentar CPU/RAM/disco) e registámos a potência elétrica do host com um medidor de tomada a 1 s de resolução. Para cada DBMS medimos a potência idle e a potência média durante workloads representativos (leituras pesadas; leitura+escrita equilibrada; escrita leve concorrente). A energia atribuída ao workload foi calculada como (P_workload − P_idle) × tempo. A energia por operação foi obtida dividindo a energia total pelo número de operações completadas. Finalmente, convertemos kWh → kg CO₂ usando o fator de emissão nacional/fonte escolhida (ex.: 0.1295 kgCO₂/kWh — Climatiq). Repetimos cada teste 5 vezes e reportámos médias e desvios-padrão. Esta metodologia segue boas práticas de medição energético-computacional na literatura. ” sciencedirect.com+1
+
+
+7) Próximos passos que eu posso fazer agora (escolha uma)
+A. Gerar um script de benchmark e medição (ex.: sysbench para MySQL + script Python para executar as mesmas queries em SQLite) e instruções para registrar ops/segundos. Posso entregar comandos e scripts prontos.
+B. Montar a seção “Resultados” com tabelas e frases (se você já tiver números ou quiser usar o protocolo hipotético).
+C. Continuar pesquisando artigos com números absolutos (J/op) para engines específicas — posso tentar achar estudos que já reportaram J/op para MySQL/SQLite (se quiser, faço nova busca focada em “energy per query sqlite” e “joules per transaction mysql”) — vai exigir mais pesquisa.
+
+1) MySQL — Sysbench
+
+Pré-requisitos
+
+sudo apt install sysbench mysql-client mysql-server -y
+
+
+Criar DB
+
+mysql -u root -p -e "CREATE DATABASE energiaTest;"
+
+
+Preparar 2M operações
+
+sysbench \
+  --db-driver=mysql \
+  --mysql-user=root \
+  --mysql-password=YOURPASS \
+  --mysql-db=energiaTest \
+  --threads=4 \
+  --tables=1 \
+  --table-size=2000000 \
+  oltp_read_write prepare
+
+
+Executar 5 blocos (2M cada)
+
+for i in {1..5}; do
+  echo "Rodada $i" >> mysql_results.txt
+  sysbench \
+    --db-driver=mysql \
+    --mysql-user=root \
+    --mysql-password=YOURPASS \
+    --mysql-db=energiaTest \
+    --threads=4 \
+    --tables=1 \
+    --table-size=2000000 \
+    --time=0 \
+    --events=2000000 \
+    oltp_read_write run >> mysql_results.txt
+done
+
+
+Limpeza
+
+sysbench --db-driver=mysql --mysql-user=root --mysql-password=YOURPASS --mysql-db=energiaTest oltp_read_write cleanup
+
+🪶 2) SQLite Script — 10 milhões ops
+
+Instale Python libs
+
+pip install sqlite3 tqdm
+
+
+sqlite_test.py
+
+import sqlite3, time, random
+from tqdm import tqdm
+
+conn = sqlite3.connect("energia_sqlite.db")
+c = conn.cursor()
+c.execute("CREATE TABLE IF NOT EXISTS teste (id INTEGER PRIMARY KEY, valor INTEGER);")
+conn.commit()
+
+total_ops = 10_000_000
+batch = 1000
+
+start = time.time()
+
+for _ in tqdm(range(total_ops//batch)):
+    data = [(random.randint(1,999999),) for _ in range(batch)]
+    c.executemany("INSERT INTO teste(valor) VALUES (?)", data)
+    conn.commit()
+    c.execute("SELECT * FROM teste ORDER BY RANDOM() LIMIT 5")
+    c.fetchall()
+
+end = time.time()
+print("Total time:", end-start, "sec")
+
+
+Run:
+
+python3 sqlite_test.py | tee sqlite_results.txt
+
+⚡ 3) Log de Energia manual
+
+Prepare uma planilha com:
+
+Rodada	Início	Fim	Watt médio (P)	Tempo (s)	Energia (Wh)
+
+Durante cada rodada:
+
+📝 Anote média dos Watts (W)
+⏱️ Anote tempo total (segundos)
+
+Fórmula:
+
+Energia (Wh) = (W médio * tempo_segundos) / 3600
+
+
+Depois some as 5 rodadas.
+
+🌍 4) Converter para CO₂
+
+Use fator: 0,1295 kgCO₂/kWh (Climatiq, Brasil)
+
+kWh = Wh / 1000
+CO2 (kg) = kWh * 0.1295
+
+📦 5) Tabela-modelo para o TCC
+DB	Tempo total	Energia (Wh)	Energia (kWh)	CO₂ (kg)	J/op
+SQLite	...	...	...	...	...
+MySQL	...	...	...	...	...
+
+Lembrete:
+
+1 kWh = 3.6e6 Joules
+J/op = Joules_totais / 10.000.000
+
+mysql_results.txt
+
+sqlite_results.txt
+
+Sua planilha de potência
+
+Eu vou gerar:
+
+✅ Gráficos (energia, CO₂, J/op)
+✅ Texto pronto para o TCC
+✅ Discussão de validade científica
+✅ Análise com p-valor e confiabilidade
+Na tabela bicicleta podemos ter:
+
+emissao_co2 → estimativa de CO₂ evitado por uso (em kg ou g)
+
+Ou criar uma tabela separada impacto_ambiental ligada a cada aluguel ou estação:
+
+id_impacto, id_bicicleta, data, co2_evitado_kg
+
+Para começar, podemos criar as tabelas assim:
+
+CREATE TABLE bicicleta (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    modelo VARCHAR(50),
+    autonomia_km INT,
+    preco DECIMAL(10,2),
+    status VARCHAR(20),
+    emissao_co2_kg DECIMAL(5,2)  -- CO2 evitado por uso
+);
+
+CREATE TABLE estacao (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nome VARCHAR(50),
+    localizacao VARCHAR(100),
+    capacidade INT
+);
+
+CREATE TABLE aluguel (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    id_bicicleta INT,
+    id_usuario INT,
+    data_inicio DATETIME,
+    data_fim DATETIME,
+    FOREIGN KEY (id_bicicleta) REFERENCES bicicleta(id)
+);
+
