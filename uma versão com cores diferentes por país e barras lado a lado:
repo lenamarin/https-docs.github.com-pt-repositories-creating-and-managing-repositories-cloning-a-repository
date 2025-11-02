@@ -1,0 +1,35 @@
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import mysql.connector
+
+# Conectar ao banco de dados MySQL
+conn = mysql.connector.connect(
+    host="seu_host",
+    user="seu_usuario",
+    password="sua_senha",
+    database="seu_banco"
+)
+
+# Ler dados da view ranking_co2_numerico
+query = "SELECT pais, modelo, co2_total, ranking FROM ranking_co2_numerico WHERE ranking <= 3"
+df = pd.read_sql(query, conn)
+
+# Fechar conexão
+conn.close()
+
+# Configurar estilo
+sns.set(style="whitegrid")
+plt.figure(figsize=(12,6))
+
+# Gráfico de barras lado a lado por país
+sns.barplot(data=df, x='modelo', y='co2_total', hue='pais')
+
+plt.xlabel('Modelo da Bicicleta')
+plt.ylabel('CO₂ Evitado (kg)')
+plt.title('Top 3 Modelos Mais Verdes por País')
+plt.xticks(rotation=45)
+plt.legend(title='País')
+plt.tight_layout()
+plt.show()
